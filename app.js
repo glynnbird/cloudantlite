@@ -246,6 +246,11 @@ module.exports = function(config) {
     }
     return u.resolve(couchUrl, dbName);
   };
+  
+  function extend(extensionName, fn) {
+    this[extensionName] = fn.bind(this);
+    //return _.extend(this, { extensionName: fn })
+  }
 
   // the thing that's returned
   return {
@@ -253,7 +258,8 @@ module.exports = function(config) {
     post: post, 
     put: put,
     del: del,
-    relax: relax
+    relax: relax,
+    extend: extend
   };
   
 }

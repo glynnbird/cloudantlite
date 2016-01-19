@@ -89,6 +89,42 @@ cloudant.del( { 'db': 'mydb', doc: 'b7b12408c2b7059433eb0e8767006219', qs: { rev
 ```
 
 
+## Extending the library
+
+Although `cloudantlite` is a minimal library, it can be programmatically extended to add your own functions:
+
+```
+var getVersion = function ( callback) {
+  this.relax({}, function (err, data) {
+    if (err) return callback(true, null);
+    callback(null, data.version);
+  });
+};
+
+var update = function(db, docid, revid, body, callback) {
+  var opts = { method: 'put', 'db': db, doc: docid, qs: { rev: revid}, body: body};
+  this.relax(opts, callback);
+};
+
+cloudant.extend("getVersion", getVersion);
+cloudant.extend("update", update);
+
+cloudant.getVersion(function(err, data) {
+  console.log(err, data);
+});
+
+cloudant.update('mydb', 'myid', '1-25f9b97d75a648d1fcd23f0a73d2776e', { a:1, b:2, c:3, d:4}, function(err, data) {
+  console.log(err, data);
+});
+```
+
+The above example shows how the `extend` function is used to attach functions to the library to provide helper functions to
+
+* return the version of CouchDB/Cloudant being used
+* update a known revision of a document
+
+The functions use `this.relax` to perform API calls.
+
 ## Debugging
 
 To see debugging messages for each request made, run your code like so:
