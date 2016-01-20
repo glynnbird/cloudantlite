@@ -16,6 +16,13 @@ module.exports = function(config) {
   }
   var cfg = config || configdefaults; 
   
+  function scrub(str) {
+    if (str) {
+      str = str.replace(/\/\/(.*)@/,"//XXXXXX:XXXXXX@");
+    }
+    return str;
+  }
+  
   function relax(opts, callback) {
     if (typeof opts === 'function') {
       callback = opts;
