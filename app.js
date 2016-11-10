@@ -2,27 +2,148 @@
 var u = require('url'),
   request = require('request'),
   _ = require('underscore'),
+  async = require('async'),
+  stream = require('stream'),
   debug = require('debug')('cloudantlite'),
   log = debug,
-  errs = require('errs'),
-  httpAgent = request;
-  configdefaults = { requst: request, url: "http://localhost:5984", requestDefaults: { jar: false}};
+  jar = request.jar(),
+  errs = require('errs');
+  
+function scrub(str) {
+  if (str) {
+    str = str.replace(/\/\/(.*)@/,'//XXXXXX:XXXXXX@');
+  }
+  return str;
+};
 
 module.exports = function(config) {
+
+  function cookieRequest(req, callback) {
+    debug('cookieRequest');
+    if (typeof callback !== 'function') {
+      callback = function() {};
+    }
+    var s = new stream.PassThrough();
+    async.series([
+      // call the request being asked for 
+      function(done) {
+
+        // if we have a cookie for this domain, then we can try the 
+        // required API call straight away
+        var cookies = jar.getCookies(cfg.url);
+        var statusCode = 500;
+        if (cookies.length > 0) {
+          debug('we have cookies so attempting API call straight away');
+          req.jar = jar;
+          request(req, function(e, h, b) {
+            if (statusCode >= 200 && statusCode < 400) {
+              // returning an err of true stops the async sequence
+              // we're good because we didn't get a 4** or 5**
+              done(true, [e,h,b]);
+            } else {
+              done(null, [e,h,b]);
+            }
+          }).on('response', function(r) {
+            statusCode = r && r.statusCode || 500;
+          }).on('data', function(chunk) {
+            if (statusCode < 400) {
+              s.write(chunk);
+            }
+          }); 
+
+        } else {
+          debug('we have no cookies - need to authenticate first');
+          // we have no cookies so we need to authenticate first
+          // i.e. do nothing here
+          done(null, null);
+        }
+
+      },
+
+      // call POST /_session to get a cookie
+      function(done) {
+        debug('need to authenticate - calling POST /_session');
+        var r = {
+          url: cfg.url + '/_session', 
+          method: 'post',
+          form: {
+            name: cfg.credentials.username,
+            password: cfg.credentials.password
+          },
+          jar: jar
+        };
+        request(r, function(e, h, b) {
+          var statusCode = h && h.statusCode || 500;
+          // if we sucessfully authenticate
+          if (statusCode >= 200 && statusCode < 400) {
+            // continue to the next stage of the async chain
+            debug('authentication successful');
+            done(null, [e,h,b]);
+          } else {
+            // failed to authenticate - no point proceeding any further
+            debug('authentication failed');
+            done(true, [e,h,b]);
+          }
+        });
+      },
+      // call the request being asked for 
+      function(done) {
+        debug('attempting API call with cookie');
+        var statusCode = 500;
+        req.jar = jar;
+        request(req, function(e, h, b) {
+          done(null, [e,h,b]);
+        }).on('response', function(r) {
+          statusCode = r && r.statusCode || 500;
+        }).on('data', function(chunk) {
+          if (statusCode < 400) {
+            s.write(chunk);
+          }
+        }); 
+      }
+    ], function(err, data) {
+        // callback with the last call we made
+        if (data && data.length > 0) {
+          var reply = data[data.length - 1];
+          callback(reply[0], reply[1], reply[2]);
+        } else {
+          callback(err, { statusCode: 500 }, null);
+        }
+    });
+
+    // return the pass-through stream
+    return s;
+  };
+
 
   // config
   if (typeof config === 'string') {
     config = { url: config };
   }
+  var configdefaults = { url: 'http://localhost:5984', requestDefaults: { jar: false}};
   var cfg = config || configdefaults; 
-  
-  function scrub(str) {
-    if (str) {
-      str = str.replace(/\/\/(.*)@/,"//XXXXXX:XXXXXX@");
-    }
-    return str;
+  cfg.request = cookieRequest;
+  var parsed = u.parse(cfg.url);
+  var auth = parsed.auth;
+  delete parsed.auth;
+  delete parsed.href;
+  cfg.url = u.format(parsed).replace(/\/$/,'');
+  if (auth) {
+    var bits = auth.split(':');
+    cfg.credentials = {
+      username: bits[0],
+      password: bits[1]
+    };
+  } else {
+    cfg.credentials = null;
   }
+  var httpAgent = cfg.request;
   
+
+  
+
+  
+
   function relax(opts, callback) {
     if (typeof opts === 'function') {
       callback = opts;
@@ -190,7 +311,7 @@ module.exports = function(config) {
       req.uri = scrub(req.uri);
       rh.uri = scrub(rh.uri);
       if (req.headers.cookie) {
-        req.headers.cookie = "XXXXXXX";
+        req.headers.cookie = 'XXXXXXX';
       }
 
       callback(errs.merge({
@@ -202,7 +323,7 @@ module.exports = function(config) {
         errid: 'non_200'
       }, errs.create(parsed)));
     });
-  }
+  };
  
   // get helper
   var get = function(opts, cb) {
@@ -211,7 +332,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'get';
-    relax(opts, cb);
+    return relax(opts, cb);
   };
 
   // post helper
@@ -221,7 +342,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'post';
-    relax(opts, cb);
+    return relax(opts, cb);
   };
 
   // put helper
@@ -231,7 +352,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'put';
-    relax(opts, cb);
+    return relax(opts, cb);
   };
 
   // delete helper
@@ -241,7 +362,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'delete';
-    relax(opts, cb);
+    return relax(opts, cb);
   };
 
   var urlResolveFix = function (couchUrl, dbName) {
@@ -253,8 +374,7 @@ module.exports = function(config) {
   
   function extend(extensionName, fn) {
     this[extensionName] = fn.bind(this);
-    //return _.extend(this, { extensionName: fn })
-  }
+  };
 
   // the thing that's returned
   return {
@@ -266,4 +386,4 @@ module.exports = function(config) {
     extend: extend
   };
   
-}
+};
