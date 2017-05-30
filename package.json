@@ -1,6 +1,6 @@
 {
   "name": "cloudantlite",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CloudantLite - a super lightweight CouchDB/Cloudant library for Node.js",
   "repository": "https://github.com/glynnbird/cloudantlite.git",
   "keywords": [
@@ -13,10 +13,10 @@
   "author": "Glynn Bird",
   "license": "Apache-2.0",
   "dependencies": {
-    "async": "^2.1.2",
-    "debug": "^2.2.0",
+    "async": "^2.4.1",
+    "debug": "^2.6.8",
     "errs": "^0.3.2",
-    "request": "^2.76.0",
+    "request": "^2.81.0",
     "underscore": "^1.8.3"
   },
   "main": "./app.js"

@@ -325,6 +325,21 @@ module.exports = function(config) {
     });
   };
  
+  var promiseRelax = function(opts, callback) {
+    return new Promise(function(resolve, reject) {
+      relax(opts, function(err, data) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(data);
+        }
+        if (callback) {
+          callback(err, data);
+        }
+      });
+    });
+  }
+
   // get helper
   var get = function(opts, cb) {
     if (typeof opts === 'function') {
@@ -332,7 +347,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'get';
-    return relax(opts, cb);
+    return promiseRelax(opts, cb);
   };
 
   // post helper
@@ -342,7 +357,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'post';
-    return relax(opts, cb);
+    return promiseRelax(opts, cb);
   };
 
   // put helper
@@ -352,7 +367,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'put';
-    return relax(opts, cb);
+    return promiseRelax(opts, cb);
   };
 
   // delete helper
@@ -362,7 +377,7 @@ module.exports = function(config) {
       opts = {};
     }
     opts.method = 'delete';
-    return relax(opts, cb);
+    return promiseRelax(opts, cb);
   };
 
   var urlResolveFix = function (couchUrl, dbName) {
