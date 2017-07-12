@@ -1,6 +1,8 @@
 # cloudantlite
 
-A super-lightweight Node.js library for Cloudant. It takes the "relax" function from Nano and removes all of the other functions leavning you with only
+[![npm version](https://badge.fury.io/js/cloudantlite.svg)](https://badge.fury.io/js/cloudantlite)
+
+A super-lightweight Node.js library for Cloudant/CouchDB. It takes the "relax" function from Nano and removes all of the other functions leaving you with only:
 
 * relax
 * get
@@ -8,7 +10,7 @@ A super-lightweight Node.js library for Cloudant. It takes the "relax" function 
 * post
 * del
 
-This removes any abstraction the the Nano library puts in place and teaches you the CouchDB HTTP API instead.
+This removes any abstraction the Nano library puts in place and teaches you the CouchDB HTTP API instead.
 
 ## Installation
 
@@ -34,7 +36,7 @@ cloudant.put( { db: 'mydb' }, function(err, data) {
 });
 ```
 
-or 
+or using Promises:
 
 ```
 cloudant.put({ db: 'mydb' }).then(console.log);
